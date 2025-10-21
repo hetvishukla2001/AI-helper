@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import fetch from 'node-fetch';
+import { ReadableStream as WebReadableStream } from 'node:stream/web';
 import { StreamChunk, ModelProvider } from './provider.interface';
 
 interface OpenAIStreamChoiceDelta {
@@ -37,6 +37,7 @@ export class OpenAIChatProvider implements ModelProvider {
 
     const started = Date.now();
 
+    // Use Node's built-in fetch (Node 18+)
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -60,26 +61,35 @@ export class OpenAIChatProvider implements ModelProvider {
       return;
     }
 
+    // Tell TS this is a Web ReadableStream so getReader() exists
+    const body = response.body as unknown as WebReadableStream<Uint8Array>;
+    const reader = body.getReader();
     const decoder = new TextDecoder();
-    const reader = response.body.getReader();
 
     let accumulated = '';
 
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
+      if (!value) continue;
+
       accumulated += decoder.decode(value, { stream: true });
+
+      // SSE lines
       const lines = accumulated.split('\n');
       accumulated = lines.pop() ?? '';
 
       for (const line of lines) {
         const trimmed = line.trim();
+
+        // Stream terminator or empty keep-alives
         if (!trimmed || trimmed === 'data: [DONE]') {
           if (trimmed === 'data: [DONE]') {
             yield {
               type: 'done',
               metrics: { latencyMs: Date.now() - started },
             };
+            return;
           }
           continue;
         }
@@ -91,16 +101,16 @@ export class OpenAIChatProvider implements ModelProvider {
           const parsed = JSON.parse(data) as OpenAIStreamChunk;
           const delta = parsed.choices?.[0]?.delta;
           const text = delta?.content?.map((c) => c.text).join('') ?? '';
+
           if (text) {
             yield { type: 'data', content: text };
           }
+
           const finishReason = parsed.choices?.[0]?.finish_reason;
           if (finishReason) {
             yield {
               type: 'done',
-              metrics: {
-                latencyMs: Date.now() - started,
-              },
+              metrics: { latencyMs: Date.now() - started },
             };
             return;
           }

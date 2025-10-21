@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
+import type { MessageStreamEvent } from '@anthropic-ai/sdk/resources/messages.mjs';
 import { StreamChunk, ModelProvider } from './provider.interface';
 
 @Injectable()
@@ -35,22 +36,42 @@ export class AnthropicMessagesProvider implements ModelProvider {
 
     let finished = false;
 
-    for await (const event of stream) {
+    // Widen the event type to include a possible "error" event for TS
+    for await (const event of stream as AsyncIterable<
+      MessageStreamEvent | { type: 'error'; error?: { message?: string } }
+    >) {
       if (event.type === 'message_start') continue;
-      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-        yield { type: 'data', content: event.delta.text };
+
+      // Incremental text
+      if (event.type === 'content_block_delta' && (event as any).delta?.type === 'text_delta') {
+        yield { type: 'data', content: (event as any).delta.text };
       }
-      if (!finished && event.type === 'message_delta' && event.delta?.stop_reason) {
+
+      // Streaming is ending due to a stop reason (e.g., end of turn)
+      if (!finished && event.type === 'message_delta' && (event as any).delta?.stop_reason) {
         finished = true;
         yield {
           type: 'done',
-          metrics: {
-            latencyMs: Date.now() - started,
-          },
+          metrics: { latencyMs: Date.now() - started },
         };
       }
-      if (!finished && (event.type === 'error' || event.type === 'message_stop')) {
+
+      // Message fully stopped
+      if (!finished && event.type === 'message_stop') {
         finished = true;
+        yield {
+          type: 'done',
+          metrics: { latencyMs: Date.now() - started },
+        };
+      }
+
+      // Error case (not present in older MessageStreamEvent unions, hence the widened type)
+      if ((event as any).type === 'error') {
+        finished = true;
+        yield {
+          type: 'error',
+          error: (event as any)?.error?.message ?? 'Anthropic stream error',
+        };
         yield {
           type: 'done',
           metrics: { latencyMs: Date.now() - started },
