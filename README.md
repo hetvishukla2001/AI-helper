@@ -7,7 +7,7 @@ Compare large language model responses side-by-side with live streaming, latency
 - 🔁 **Session management** – Create comparison sessions that broadcast the same prompt to multiple models at once.
 - ⚡ **Real-time streaming** – Responses stream chunk-by-chunk using Server Sent Events (SSE) so the UI updates instantly.
 - 📊 **Metrics dashboard** – Capture completion time, token usage, and estimated costs for every model response.
-- 🧰 **Pluggable model registry** – Easily configure multiple OpenAI models (or extend with additional providers).
+- 🧰 **Pluggable model registry** – Easily configure OpenAI and Anthropic models (or extend with additional providers).
 - 💾 **Session storage** – Persist prompts and results for quick retrieval during the runtime of the server.
 - 🖥️ **Modern UI** – A polished Next.js frontend renders markdown responses, highlights status changes, and keeps columns aligned.
 
@@ -26,24 +26,24 @@ Compare large language model responses side-by-side with live streaming, latency
 
 - Node.js 18+
 - pnpm, npm, or yarn package manager
-- An OpenAI API key (for real model streaming)
+- OpenAI and Anthropic API keys (for real model streaming)
 
 ### Backend setup
 
 ```bash
 cd backend
 cp .env.example .env
-# edit .env with your OpenAI API key and desired origin
+# edit .env with your API keys and desired overrides
 npm install
 npm run start:dev
 ```
 
 The backend exposes the following primary endpoints:
 
+- `GET /sessions/providers` – list available model providers
 - `POST /sessions` – start a new comparison session
-- `GET /sessions/:id/models/:modelId/stream` – SSE stream for a specific model response
-- `GET /sessions` – list previously created sessions (in-memory)
-- `GET /sessions/models` – list available model definitions
+- `GET /sessions/:id` – fetch session metadata
+- `GET /sessions/:id/stream` – SSE stream delivering incremental response chunks, metrics, and status updates
 
 ### Frontend setup
 
@@ -58,12 +58,12 @@ The frontend expects the backend to be running and accessible at the URL defined
 
 ### Deployment notes
 
-- **Backend** – deploy to any Node-friendly platform (e.g., Render, Railway). Be sure to set `OPENAI_API_KEY`, `PORT`, and `FRONTEND_ORIGIN` environment variables.
+- **Backend** – deploy to any Node-friendly platform (e.g., Render, Railway). Be sure to set `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `PORT`, and any default model overrides.
 - **Frontend** – deploy to Vercel/Netlify. Configure `NEXT_PUBLIC_API_BASE_URL` to point at the deployed backend URL.
 
 ### Extending the playground
 
-- Add more model entries to the registry in `backend/src/ai/ai-provider.service.ts`.
+- Add more model entries to the registry in `backend/src/sessions/providers/providers.registry.ts`.
 - Swap out the in-memory session store with a database by implementing a new storage service.
 - Connect user authentication or history syncing for persistent comparisons.
 
