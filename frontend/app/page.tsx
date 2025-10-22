@@ -32,9 +32,13 @@ export default function HomePage() {
       try {
         const res = await fetch(`${API_BASE_URL}/sessions/providers`);
         const data = await res.json();
-        setProviders(data);
-        if (data.length > 0) {
-          setSelectedModels(data.slice(0, 2).map((item: ModelProviderInfo) => item.id));
+        const visible = (data as ModelProviderInfo[]).filter(
+          (p) => p.id !== 'anthropic-claude-3-haiku'
+        );
+  
+        setProviders(visible);
+        if (visible.length > 0) {
+          setSelectedModels(visible.slice(0, 2).map((p) => p.id));
         }
       } catch (error) {
         console.error('Failed to fetch providers', error);

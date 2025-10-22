@@ -5,7 +5,12 @@ import { StreamChunk, ModelProvider } from './provider.interface';
 export class GeminiProvider implements ModelProvider {
   readonly id = 'google-gemini-1.5-flash';
   readonly name = 'Google Gemini 1.5 Flash';
-  private readonly model = 'gemini-1.5-flash'; // ✅ updated
+  private readonly model: string;
+
+  constructor() {
+    // Allow override through .env
+    this.model = process.env.GEMINI_DEFAULT_MODEL || 'gemini-1.5-flash';
+  }
 
   async *streamCompletion(prompt: string, abortSignal: AbortSignal): AsyncGenerator<StreamChunk> {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -15,18 +20,17 @@ export class GeminiProvider implements ModelProvider {
       return;
     }
 
-    // ✅ updated endpoint from v1beta → v1
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1/models/${this.model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
-        signal: abortSignal,
-      },
-    );
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent?key=${apiKey}`;
+    const started = Date.now();
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+      signal: abortSignal,
+    });
 
     if (!res.ok) {
       const text = await res.text();
@@ -38,6 +42,9 @@ export class GeminiProvider implements ModelProvider {
     const data = await res.json();
     const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
     yield { type: 'data', content: text };
-    yield { type: 'done', metrics: { latencyMs: 0 } };
+    yield {
+      type: 'done',
+      metrics: { latencyMs: Date.now() - started },
+    };
   }
 }

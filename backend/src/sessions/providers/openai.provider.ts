@@ -100,7 +100,12 @@ export class OpenAIChatProvider implements ModelProvider {
         try {
           const parsed = JSON.parse(data) as OpenAIStreamChunk;
           const delta = parsed.choices?.[0]?.delta;
-          const text = delta?.content?.map((c) => c.text).join('') ?? '';
+          let text = '';
+          if (Array.isArray(delta?.content)) {
+            text = delta.content.map((c) => c.text ?? '').join('');
+          } else if (typeof (delta as any)?.content === 'string') {
+            text = (delta as any).content;
+          }
 
           if (text) {
             yield { type: 'data', content: text };
