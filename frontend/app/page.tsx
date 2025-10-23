@@ -156,29 +156,39 @@ export default function HomePage() {
             }
           }
 
-          if (payload.type === 'chunk' && payload.modelId && payload.chunk) {
+          // inside eventSource.onmessage = (event) => { ... }
+          if (payload.type === 'chunk') {
+            if (!payload.modelId) {
+              return;
+            }
+
             setModelStates((prev) => {
-              const target = prev[payload.modelId];
+              const id = payload.modelId as string;        // cast to string for indexing
+              const target = prev[id];
               if (!target) return prev;
 
-              const nextStatus: ModelStatus = payload.chunk.error
-                ? 'error'
-                : payload.chunk.done
-                ? 'completed'
-                : 'streaming';
+              const nextStatus: ModelStatus =
+                payload.chunk?.error
+                  ? 'error'
+                  : payload.chunk?.done
+                  ? 'completed'
+                  : 'streaming';
 
               return {
                 ...prev,
-                [payload.modelId]: {
+                [id]: {
                   ...target,
                   status: nextStatus,
-                  content: target.content + (payload.chunk.content ?? ''),
-                  error: payload.chunk.error,
-                  metrics: payload.chunk.metrics ? { ...target.metrics, ...payload.chunk.metrics } : target.metrics,
+                  content: target.content + (payload.chunk?.content ?? ''),
+                  error: payload.chunk?.error,
+                  metrics: payload.chunk?.metrics
+                    ? { ...target.metrics, ...payload.chunk.metrics }
+                    : target.metrics,
                 },
               };
             });
           }
+
         } catch (error) {
           console.error('Failed to parse stream payload', error);
         }
