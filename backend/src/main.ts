@@ -10,13 +10,19 @@ async function bootstrap() {
 
   // Enable CORS for your frontend (localhost + Vercel)
   app.enableCors({
-    origin: [
-      'http://localhost:3000',      // local frontend
-      /\.vercel\.app$/,             // any deployed Vercel frontend
-    ],
+    origin: true, // reflect request Origin header (allows any origin)
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+  
+  // app.enableCors({
+  //   origin: [
+  //     'http://localhost:3000',     
+  //     /\.vercel\.app$/,             
+  //   ],
+  //   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  //   allowedHeaders: ['Content-Type', 'Authorization'],
+  // });
   const helmet = (helmetNS as unknown as (opts?: any) => import('express').RequestHandler);
   const compression = (compressionNS as unknown as (opts?: any) => import('express').RequestHandler);
 
